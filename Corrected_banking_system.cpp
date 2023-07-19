@@ -9,34 +9,39 @@
 
 
 using namespace std;
-//#include "bank_employ_side.cpp"
+
 string PASS;
 vector<int> char_value;
 vector<string> account_type;
-long AN = 0;
-long saving_initial_ammount = 10000;
-long current_initial_ammount = 100000;
+long AN,ATM_NUMBER;
+long min_saving_initial_ammount = 10000;
+long min_current_initial_ammount = 100000;
 vector<float> interest_rate;
 long below_NRV_charge;
 long max_transaction_charge;
 long atm_charge;
 double transaction_charge_persent;
 
-void set_char_value(){
-    char_value.push_back(1);
-    for(int i=1;i<26;i++){
-        char_value.push_back(char_value[i-1]*2 +i+1);
-    }
-}
+class date{
+    public:
+    int year;
+    int month;
+    int day;
+};
+class ATM{
+    public:
+    long atm_number;
+    int cvv;
+    date *exp_date;
+};
 
 class transaction{
     public:
     long ammount;
     string comment;
-
+    date *transaction_date;
     transaction* next;
     transaction* prev;
-
 };
 
 class account{
@@ -44,15 +49,11 @@ class account{
     long account_number;
     long account_type;
     long total_ammount;
+    date *account_opening_date;
+    ATM atm_details;
     transaction* last_transaction;
-   // long NRV;          // change NRV to double
     long atm_transaction;
     long total_transaction;
-
-
-    // account* next;
-    // account* prev;
-    
 };
 
 
@@ -60,18 +61,80 @@ class customer{
     public:
     string first_name, middle_name, last_name, email_id, password;
     long customer_id, mobile_number;
+    date *DOB;
     map<long, account>  customer_accounts;
     
 };
 
-//customer* customer_head;
+
+
+//customer* customer_head; 
 map<long, customer*> mp;
 
+int give_age(date *date1, date *date2){
+    if(date2->month > date1->month || (date2->month == date1->month && date2->day >= date1->day)) return date2->year - date1->year;
+    else return date2->year - date1->year -1;
+}
+
+void set_char_value(){
+    char_value.push_back(1);
+    for(int i=1;i<26;i++){
+        char_value.push_back(char_value[i-1]*2 +i+1);
+    }
+}
 void print_services(){
     cout << "1. Account Opening \n";
     cout << "2. Login \n";
     cout << "3. Exit \n";
 
+}
+void print_transaction_history(account this_account){
+    cout<<"How many transaction you want to see\n";
+    int number_of_transaction;
+    cin >>number_of_transaction;
+    transaction *temp = this_account.last_transaction;
+    if(temp){
+        while(temp && number_of_transaction--){
+            cout<<"Ammount: "<<temp->ammount<<"     Comment: "<<temp->comment<<"    date: "<<temp->transaction_date->day<<"/"<<temp->transaction_date->month<<"/"<<temp->transaction_date->month <<endl;
+            temp =temp->prev;
+        }
+    }
+    else cout<<"No_transaction found\n";
+}
+
+void print_user_info(long customer_id){
+    cout<<"\n\n\n";
+    cout<<"-----------------------------------------------\n";
+    customer *this_customer = mp[customer_id];
+    cout<<"Name: " <<this_customer->first_name+ " " + this_customer->middle_name+ " "+ this_customer->last_name << endl;
+    cout<<"Customer id: "<< this_customer->customer_id <<endl;
+    cout<<"Mobile Number: "<<this_customer->mobile_number<<endl;
+    cout<<"Email: "<<this_customer->email_id<<endl;
+    cout<<"Date of Birth: "<<this_customer->DOB->day<<"/"<<this_customer->DOB->month<<"/"<<this_customer->DOB->year<<endl;
+
+}
+
+void Account_Details(long customer_id, long account_number){
+    print_user_info(customer_id);
+
+    customer *this_customer = mp[customer_id];
+    account this_account = (this_customer)->customer_accounts[account_number];
+    cout<<"Account balance: "<<this_account.total_ammount<<endl;
+    cout<<"Account Number: "<<this_account.account_number<<"       Account Type: "<<account_type[this_account.account_type-1]<<endl;
+    cout<<"This Month atm transaction: "<<this_account.atm_transaction<<"          total tranaction: "<<this_account.total_transaction<<endl;
+
+    cout<<"select one option\n";
+    cout<<"1. view transaction History\n";
+    cout<<"2. back\n";
+    int responce;
+    cin>>responce;
+    if(responce==1){
+        print_transaction_history(this_account);
+        Account_Details(customer_id, account_number);
+    }
+    else if(responce==2){
+      return;
+    }    
 }
 
 long generate_customer_id(string name){
@@ -90,27 +153,28 @@ long add_initial_ammount_to_account(int type){
     cin >> initial_ammount;
 
     if(type ==1){
-        if(initial_ammount  >= saving_initial_ammount){
+        if(initial_ammount  >= min_saving_initial_ammount){
         return initial_ammount;
         }
         else {
             cout << "Minimum amount needed to open an account is Rs ";
-            cout << saving_initial_ammount<<endl;
+            cout << min_saving_initial_ammount<<endl;
             return add_initial_ammount_to_account(type);
         }
     }
     else{
-        if(initial_ammount  >= current_initial_ammount){
+        if(initial_ammount  >= min_current_initial_ammount){
         return initial_ammount;
         }
         else {
             cout << "Minimum amount needed to open an account is Rs ";
-            cout << current_initial_ammount<<endl;
+            cout << min_current_initial_ammount<<endl;
             return add_initial_ammount_to_account(type);
         }
     }
 
 }
+
 
 void make_new_account(int type){
     
@@ -128,13 +192,28 @@ void make_new_account(int type){
     cout << "Enter your last name\n";
     cin >> last_name;
 
-    int DOB_D,DOB_M,DOB_Y;
-    cout<< "enter your year of birth\n";
-    cin >> DOB_Y;
-    cout<<" enter your month of birth\n";
-    cin >> DOB_M;
-    cout<< " enter your day of birth\n";
-    cin >> DOB_D;
+    date* DOB = new date;
+    cout<<"Enter your date of birth in DDMMYYYY formate\n";
+    int date_of_birth;
+    cin>>date_of_birth;
+    DOB->day = date_of_birth/1000000;
+    DOB->month = (date_of_birth%1000000 - date_of_birth%10000)/10000;
+    DOB->year =date_of_birth%10000;
+
+    date* account_opening_date = new date;
+    cout<<"Enter Todays's date in DDMMYYYY formate\n";
+    int todays_date;
+    cin>>todays_date;
+    account_opening_date->day = todays_date/1000000;
+    account_opening_date->month = (todays_date%1000000 - todays_date%10000)/10000;
+    account_opening_date->year =todays_date%10000;
+
+    if(type ==2){
+        if(give_age(DOB,account_opening_date) <= 18) {
+            cout<<"Your age is less then 18. You are not eligible to open current accout.";
+            return;
+        }
+    }
 
     long mobile_number;
     cout<< "Enter your Mobile number\n";
@@ -145,8 +224,10 @@ void make_new_account(int type){
     cin >> email_id;
 
     cout<< "Enter your address\n";
-    cin >> address;
-    //cin.getline(address, 200);
+   // cin >> address;
+    getline(cin, address);
+
+
 
     cout<< "Create password\n";
     cout<<"enter your password\n";
@@ -155,51 +236,53 @@ void make_new_account(int type){
     long initial_ammount;
     initial_ammount = add_initial_ammount_to_account(type);
     if(initial_ammount!=0){
-        //make an node and add to linklist of  name customer_list
         customer* temp = new customer;
-        // while(temp){
-        //     temp = temp->next;
-        // }
 
         temp->first_name = first_name;
-        
         temp->last_name = last_name;
         temp->middle_name = middle_name;
         temp->mobile_number = mobile_number;
-        
+        temp->DOB = DOB;
         temp->customer_id = customer_id;
-     cout<<customer_id<<endl;
+        cout<<customer_id<<endl;
         temp->email_id = email_id;
         temp->password = password;
+
        // temp->customer_accounts = new account;
+        ATM *new_atm = new ATM;
+        date *exp_date = account_opening_date;
+        exp_date->year +=20;
+        new_atm->atm_number = ATM_NUMBER;
+        new_atm->cvv = (rand()%1000);
+        new_atm->exp_date = exp_date;
 
         account* user_account = new account;
         user_account->account_number = AN;
         user_account->account_type = type;
         user_account->atm_transaction=0;
+        user_account->atm_details = *new_atm;
+        user_account->account_opening_date = account_opening_date;
         user_account->total_ammount = initial_ammount;
         user_account->last_transaction = new transaction;
         user_account->total_transaction = 0;
 
         user_account->last_transaction->ammount = initial_ammount;
         user_account->last_transaction->comment = "Initial_money_added";
+        user_account->last_transaction->transaction_date= account_opening_date;
         user_account->last_transaction->next = NULL;
         user_account->last_transaction->prev = NULL;
 
+        cout<<"-------------------------------------------\n";
+        cout<<"Account created successfully\n";
+       //Account_Details(customer_id, AN);
+        cout<<"-------------------------------------------\n";
+
+
         temp->customer_accounts[AN++] = *user_account;
-      //  (temp->customer_accounts).push_back(*user_account);
-
-            
         mp[customer_id] = temp;
-
-        cout <<"Your savings account created successfully\n";
-      //  cout<<mp[customer_id]->first_name<<endl;
-       // cout<<mp[customer_id]->mobile_number<<endl;
-    }
-
     
+    }    
     return;
-
 }
 
 long LA(){
@@ -220,11 +303,6 @@ long LA(){
 
 
 void add_new_account(long customer_id, int type){
-   // account *temp = mp[customer_id]->customer_accounts;
-
-   // account *new_account = new account;
-
-   // while( != NULL) temp = temp->next;
    long initial_ammount;
     if(type>2){
         initial_ammount = LA();
@@ -233,23 +311,57 @@ void add_new_account(long customer_id, int type){
     else{
         initial_ammount = add_initial_ammount_to_account(type);
     }
-    //new_account.
-    cout<<"Initial ammount is: "<<initial_ammount<<endl;
+
+    date* account_opening_date = new date;
+    cout<<"Enter Todays's date in DDMMYYYY formate";
+    int todays_date;
+    cin>>todays_date;
+    account_opening_date->day = todays_date/1000000;
+    account_opening_date->month = (todays_date%1000000 - todays_date%10000)/10000;
+    account_opening_date->year =todays_date%10000;
+
+    if(type ==2){
+        if(give_age((mp[customer_id]->DOB),account_opening_date) < 18) {
+            cout<<"Your age is less then 18. You are not eligible to open current accout.";
+            return;
+        }
+    }
+    else if(type >2){
+        if(give_age((mp[customer_id]->DOB), account_opening_date) < 25){
+            cout<<"Your age is less then 25. You are not eligible to open loan accout.";
+            return;
+        }
+    }
+
+    ATM *new_atm = new ATM;
+    date *exp_date = account_opening_date;
+    exp_date->year +=20;
+    new_atm->atm_number = ATM_NUMBER++;
+    new_atm->cvv = (rand()%1000);
+    new_atm->exp_date = exp_date;
+
 
     account* user_account = new account;
     user_account->account_number = AN;
     user_account->account_type = type;
     user_account->atm_transaction=0;
+    user_account->atm_details = *new_atm;
+    user_account->account_opening_date = account_opening_date;
     user_account->total_ammount = initial_ammount;
+
     user_account->last_transaction = new transaction;
     user_account->total_transaction = 0;
 
     user_account->last_transaction->ammount = initial_ammount;
     user_account->last_transaction->comment = "Initial_money_added";
+    user_account->last_transaction->transaction_date = account_opening_date;
     user_account->last_transaction->next = NULL;
     user_account->last_transaction->prev = NULL;
 
-cout<<"Account created successfully\n";
+    cout<<"-------------------------------------------\n";
+    cout<<"Account created successfully\n";
+    //Account_Details(customer_id, AN);
+    cout<<"-------------------------------------------\n";
 
     mp[customer_id]->customer_accounts[AN++] = *user_account;
     //  (temp->customer_accounts).push_back(*user_account);
@@ -328,7 +440,7 @@ cout<<"I am at step 4\n";
     mp[receiver_customer_id]->customer_accounts[receiver_account_number].total_ammount += ammount;
 
     cout<<"----------------------------------------\n";
-    cout<<"Transaction complete \n";
+    cout<<"Transaction Successfull \n";
     cout<<"----------------------------------------\n";
     
 }
@@ -472,30 +584,9 @@ void open_account(){
 
 }
 
-void print_transaction_history(account this_account){
-    cout<<"How many transaction you want to see\n";
-    int number_of_transaction;
-    cin >>number_of_transaction;
-    transaction *temp = this_account.last_transaction;
-    if(temp){
-        while(temp && number_of_transaction--){
-            cout<<"Ammount: "<<temp->ammount<<"       Comment: "<<temp->comment<<endl;
-            temp =temp->prev;
-        }
-    }
-    else cout<<"No_transaction found\n";
-}
 
-void print_user_info(long customer_id){
-    cout<<"\n\n\n";
-    cout<<"-----------------------------------------------\n";
-    customer *this_customer = mp[customer_id];
-    cout<<"Name: " <<this_customer->first_name+ " " + this_customer->middle_name+ " "+ this_customer->last_name << endl;
-    cout<<"Customer id: "<< this_customer->customer_id <<endl;
-    cout<<"Mobile Number: "<<this_customer->mobile_number<<endl;
-    cout<<"Email: "<<this_customer->email_id<<endl;
 
-}
+
 long give_account_option(long customer_id){
     customer *this_customer = mp[customer_id];
     map<long, account> user_accounts = this_customer->customer_accounts;
@@ -518,29 +609,7 @@ long give_account_option(long customer_id){
 
 }
 
-void Account_Details(long customer_id, long account_number){
-    print_user_info(customer_id);
 
-    
-    customer *this_customer = mp[customer_id];
-    account this_account = (this_customer)->customer_accounts[account_number];
-    cout<<"Account balance: "<<this_account.total_ammount<<endl;
-    cout<<"Account Number: "<<this_account.account_number<<"       Account Type: "<<account_type[this_account.account_type-1]<<endl;
-    cout<<"This Month atm transaction: "<<this_account.atm_transaction<<"          total tranaction: "<<this_account.total_transaction<<endl;
-
-    cout<<"select one option\n";
-    cout<<"1. view transaction History\n";
-    cout<<"2. back\n";
-    int responce;
-    cin>>responce;
-    if(responce==1){
-        print_transaction_history(this_account);
-        Account_Details(customer_id, account_number);
-    }
-    else if(responce==2){
-      return;
-    }    
-}
 
 void Customer_Details(long customer_id){
     print_user_info(customer_id);
@@ -708,8 +777,6 @@ void services_(){
    services_();
 }
 
-
-
 void print_customer(){
     cout<<"entered in print function";
     for(auto cu : mp){
@@ -718,12 +785,30 @@ void print_customer(){
     
 }
 
+// void add_interest(){
+//     for(auto this_customer : mp){
+//         long customer_id = this_customer.first;
+
+//         for(auto user_account : mp[customer_id]->customer_accounts){
+
+//         } 
+//     }
+// }
+
 void Bank_employ_view(){
     cout<<"What you want to see\n";
     cout<<"1. print all customer\n";
-    cout<<"2. exit";
+    cout<<"2. add interest";
+    cout<<"3. exit";
     
-    print_customer();
+    int responce;
+    cin>>responce;
+
+    //if(responce==1) print_customer();
+   // else if(responce==2)add_interest();
+    //else return;
+
+    //print_customer();
 }
 
 void who_are_you(){
@@ -757,6 +842,7 @@ int main(){
     char_value.clear();
     set_char_value();
     AN=5433789245;
+    ATM_NUMBER = 2345378987654389;
     mp.clear();
     account_type.clear();
    // account_type = {"Saving Account", "Current Account", "Home Loan", "Car loan", "Personal loan", "Business Loan"};

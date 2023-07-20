@@ -41,6 +41,7 @@ class transaction{
     string comment;
     date *transaction_date;
     long transaction_charge;
+    long transaction_type;    // 1. deposit, 2. atm , 3. monthly, 4. nrv_charge
     transaction* next;
     transaction* prev;
 };
@@ -271,6 +272,7 @@ void make_new_account(int type){
         user_account->last_transaction->comment = "Initial_money_added";
         user_account->last_transaction->transaction_date= account_opening_date;
         user_account->last_transaction->transaction_charge =0;
+        user_account->last_transaction->transaction_type=1;
         user_account->last_transaction->next = NULL;
         user_account->last_transaction->prev = NULL;
 
@@ -358,6 +360,7 @@ void add_new_account(long customer_id, int type){
     user_account->last_transaction->comment = "Initial_money_added";
     user_account->last_transaction->transaction_date = account_opening_date;
     user_account->last_transaction->transaction_charge =0;
+    user_account->last_transaction->transaction_type =1;
     user_account->last_transaction->next = NULL;
     user_account->last_transaction->prev = NULL;
 
@@ -627,10 +630,34 @@ void Customer_Details(long customer_id){
         Customer_Details(customer_id);
     }
 }
+long days_between_two_dates(date* date1, date* date2){
+    long days = (date1->year - date2->year)*365 + (date1->month - date2->month)*30 + (date1->day - date2->day);
+    return days;
+}
+
+long total_withdraw_in_one_day(long customer_id, long account_number,date* today_date){
+    long ammount=0;
+    transaction *temp = mp[customer_id]->customer_accounts[account_number].last_transaction;
+
+    while(temp){
+        date* transaction_date = temp->transaction_date;
+        long days = days_between_two_dates(today_date, transaction_date);
+        if(days == 0) {
+      //if(today_date == transaction_date){
+        ammount += abs(temp->ammount); 
+        
+      }
+      else break;
+      temp = temp->prev;
+    }
+return ammount;
+
+}
 
 void withdrow_money_using_atm(long customer_id){
     print_user_info(customer_id);
     long account_number = give_account_option(customer_id);
+    if(account_number ==0 )return;
 
     long ammount;
     long account_type = mp[customer_id]->customer_accounts[account_number].account_type;
@@ -642,27 +669,6 @@ void withdrow_money_using_atm(long customer_id){
 
     cout<<"Enter ammount that you want to withdrow\n";
     cin>>ammount;
-    long charge = 0;
-    if(mp[customer_id]->customer_accounts[account_number].total_ammount < ammount) {
-        cout<<"You not have sufficient balance\n";
-        return;
-    }
-       
-    if(account_type==1){
-        if(ammount > 20000) {
-            "You can not withdraw more then Rs. 20000\n";
-            return;
-        }
-       // else if(this_month)
-        else if(mp[customer_id]->customer_accounts[account_number].atm_transaction >=5) charge = 500;
-
-        //one more condition;
-    }
-    else if(account_type ==2){
-        double curr_charge = (((double)ammount)*(0.5))/100;
-        charge = long(curr_charge);
-        if(charge > 500) charge =500;
-    }
 
     date *transaction_date = new date;
     cout<<"Enter Todays's date in DDMMYYYY formate\n";
@@ -672,6 +678,37 @@ void withdrow_money_using_atm(long customer_id){
     transaction_date->month = (todays_date%1000000 - todays_date%10000)/10000;
     transaction_date->year =todays_date%10000;
 
+    long charge = 0;
+    if(mp[customer_id]->customer_accounts[account_number].total_ammount < ammount) {
+        cout<<"You not have sufficient balance\n";
+        return;
+    }
+       
+    if(account_type==1){
+        if(ammount > 20000) {
+            cout<<"You can not withdraw more then Rs. 20000\n";
+            withdrow_money_using_atm(customer_id);
+        }
+        long todays_withdraw =total_withdraw_in_one_day(customer_id, account_number, transaction_date);
+        cout<<"Todays withdraw: "<<todays_withdraw<<endl;
+      if( todays_withdraw> 50000){
+            cout<<"Your daily limit 50000. You can not withdraw money today \n"<<(50000 - todays_withdraw);
+            withdrow_money_using_atm(customer_id);
+      }
+      else if((todays_withdraw + ammount) > 50000){
+        cout<<"Your daily limit is 50000, Today you withdraw maximun Rs. "<<(50000 - todays_withdraw) <<endl;
+        withdrow_money_using_atm(customer_id);
+      }
+       else if(mp[customer_id]->customer_accounts[account_number].atm_transaction >=5) charge = 500;
+    }
+    else if(account_type ==2){
+        double curr_charge = (((double)ammount)*(0.5))/100;
+        charge = long(curr_charge);
+        if(charge > 500) charge =500;
+    }
+
+    
+
     mp[customer_id]->customer_accounts[account_number].total_ammount -= (ammount + charge);
     mp[customer_id]->customer_accounts[account_number].total_transaction +=1;
     mp[customer_id]->customer_accounts[account_number].atm_transaction +=1;
@@ -680,6 +717,7 @@ void withdrow_money_using_atm(long customer_id){
     new_atm_transaction->ammount = -ammount;
     new_atm_transaction->comment = "Withdrow using ATM";
     new_atm_transaction->transaction_charge = charge;
+    new_atm_transaction->transaction_type =2;
     new_atm_transaction->transaction_date = transaction_date;
     new_atm_transaction->prev = mp[customer_id]->customer_accounts[account_number].last_transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction->next = new_atm_transaction;
@@ -729,6 +767,7 @@ void deposit_money_in_bank_account(long customer_id){
     new__transaction->comment = "Deposit money in bank account";
     new__transaction->transaction_date = transaction_date;
     new__transaction->transaction_charge =0;
+    new__transaction->transaction_type=1;
     new__transaction->prev = mp[customer_id]->customer_accounts[account_number].last_transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction->next = new__transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction = mp[customer_id]->customer_accounts[account_number].last_transaction->next;
@@ -842,11 +881,7 @@ long min_(long a, long b){
     return a;
 }
 
-long days_between_two_dates(date* date1, date* date2){
-    long days = (date1->year - date2->year)*365 + (date1->month - date2->month)*30 + (date1->day - date2->day);
-    cout<<"count days: "<<days<<endl;
-    return days;
-}
+
 
 long total_interest(long customer_id, long account_number, date* today_date){
   
@@ -864,11 +899,9 @@ long total_interest(long customer_id, long account_number, date* today_date){
         long transaction_ammount = temp->ammount;
 
         starting_month_balance -= transaction_ammount;
-        cout<<"count days\n";
      long days_between =  days_between_two_dates(today_date, transaction_date);
      today_date = transaction_date;
        ammount_and_days.push_back(make_pair(transaction_ammount, days_between));
-       cout<<"pushed in vector \n";
         days -=days_between;
         if(days <= 0){
             break;
@@ -907,6 +940,7 @@ void add_interest_money(long customer_id, long account_number, date* today_date)
     new__transaction->comment = "Monthly interest";
     new__transaction->transaction_date = today_date;
     new__transaction->transaction_charge =0;
+    new__transaction->transaction_type = 3;
     new__transaction->prev = mp[customer_id]->customer_accounts[account_number].last_transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction->next = new__transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction = mp[customer_id]->customer_accounts[account_number].last_transaction->next;
@@ -967,6 +1001,7 @@ void less_NRV_fine(){
             new__transaction->comment = "Your balance less then NRV value\n";
             new__transaction->transaction_date = transaction_date;
             new__transaction->transaction_charge =0;
+            new__transaction->transaction_type =4;
             new__transaction->prev = mp[customer_id]->customer_accounts[account_number].last_transaction;
             mp[customer_id]->customer_accounts[account_number].last_transaction->next = new__transaction;
             mp[customer_id]->customer_accounts[account_number].last_transaction = mp[customer_id]->customer_accounts[account_number].last_transaction->next;

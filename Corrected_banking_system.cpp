@@ -21,6 +21,8 @@ long below_NRV_charge;
 long max_transaction_charge;
 long atm_charge;
 double transaction_charge_persent;
+vector<long> profit;
+long this_month_profit;
 
 class date{
     public:
@@ -54,7 +56,7 @@ class account{
     date *account_opening_date;
     ATM atm_details;
     transaction* last_transaction;
-    long atm_transaction;
+    long atm_transaction; 
     long total_transaction;
 };
 
@@ -204,7 +206,7 @@ void make_new_account(int type){
 
     date* account_opening_date = new date;
     cout<<"Enter Todays's date in DDMMYYYY formate\n";
-    int todays_date;
+    long todays_date;
     cin>>todays_date;
     account_opening_date->day = todays_date/1000000;
     account_opening_date->month = (todays_date%1000000 - todays_date%10000)/10000;
@@ -251,7 +253,7 @@ void make_new_account(int type){
         temp->password = password;
 
        // temp->customer_accounts = new account;
-        ATM *new_atm = new ATM;
+         ATM *new_atm = new ATM;
         date *exp_date = account_opening_date;
         exp_date->year +=20;
         new_atm->atm_number = ATM_NUMBER;
@@ -262,14 +264,16 @@ void make_new_account(int type){
         user_account->account_number = AN;
         user_account->account_type = type;
         user_account->atm_transaction=0;
-        user_account->atm_details = *new_atm;
         user_account->account_opening_date = account_opening_date;
+
+        user_account->atm_details = *new_atm;
         user_account->total_ammount = initial_ammount;
         user_account->last_transaction = new transaction;
         user_account->total_transaction = 0;
 
         user_account->last_transaction->ammount = initial_ammount;
         user_account->last_transaction->comment = "Initial_money_added";
+        account_opening_date->year -=20;
         user_account->last_transaction->transaction_date= account_opening_date;
         user_account->last_transaction->transaction_charge =0;
         user_account->last_transaction->transaction_type=1;
@@ -289,40 +293,61 @@ void make_new_account(int type){
     return;
 }
 
-long LA(){
+long LA(long customer_id){
+
+    customer* user = mp[customer_id];
+
+    long total_deposit_ammount = 0;
+
+    map<long, account> accounts = user->customer_accounts;
+
+    for(auto  user_account : accounts){
+        if(user_account.second.account_type <=2){
+            total_deposit_ammount += user_account.second.total_ammount;
+        }
+    }
+
+    if(total_deposit_ammount < 1250000){
+        cout<<"Your total deposited ammount less then 1250000. you are not eligibal for loan\n";
+        return -1;
+    }
+    
+    long max_loan = (total_deposit_ammount*40)/100;
+
     cout<<"Enter how much loan you want or type -1 to exit\n";
     long loan_ammount;
     cin >>loan_ammount;
-    if(loan_ammount >= 500000){
-        return loan_ammount;
+    cout<<"Enter loan duration in years\n";
+    float years;
+    cin>>years;
+    if(years<2.0){
+        cout<<"Minimum loan duration is 2 years\n";
+        LA(customer_id);
     }
-    if(loan_ammount == -1){
-        return -1;
+
+    if(loan_ammount < 500000){
+        cout<<"Minimun loan ammount is 500000\n";
+        return LA(customer_id);
     }
-    else {
-        cout<<"Minimun loan ammount is 5000000\n";
-        return LA();
-    }
+    else if(loan_ammount == -1) return -1;
+
+    if(loan_ammount <= max_loan )   return loan_ammount;
+    
+    cout<<"You take only Rs. "<<max_loan<<" as a loan\n";
+    return LA(customer_id);
 }
 
 
 void add_new_account(long customer_id, int type){
-   long initial_ammount;
-    if(type>2){
-        initial_ammount = LA();
-        if(initial_ammount == -1) return;
-    }
-    else{
-        initial_ammount = add_initial_ammount_to_account(type);
-    }
 
     date* account_opening_date = new date;
-    cout<<"Enter Todays's date in DDMMYYYY formate";
-    int todays_date;
+    cout<<"Enter Todays's date in DDMMYYYY formate\n";
+    long todays_date;
     cin>>todays_date;
     account_opening_date->day = todays_date/1000000;
     account_opening_date->month = (todays_date%1000000 - todays_date%10000)/10000;
     account_opening_date->year =todays_date%10000;
+
 
     if(type ==2){
         if(give_age((mp[customer_id]->DOB),account_opening_date) < 18) {
@@ -337,19 +362,34 @@ void add_new_account(long customer_id, int type){
         }
     }
 
+   long initial_ammount;
+
+    if(type>2){
+        initial_ammount = LA(customer_id);
+        if(initial_ammount == -1) return;
+
+
+        
+    }
+    else{
+        initial_ammount = add_initial_ammount_to_account(type);
+    
+    }
+
     ATM *new_atm = new ATM;
     date *exp_date = account_opening_date;
     exp_date->year +=20;
     new_atm->atm_number = ATM_NUMBER++;
     new_atm->cvv = (rand()%1000);
     new_atm->exp_date = exp_date;
+    
 
 
     account* user_account = new account;
     user_account->account_number = AN;
     user_account->account_type = type;
     user_account->atm_transaction=0;
-    user_account->atm_details = *new_atm;
+    if(type <=2)  user_account->atm_details = *new_atm;
     user_account->account_opening_date = account_opening_date;
     user_account->total_ammount = initial_ammount;
 
@@ -378,6 +418,11 @@ void add_new_account(long customer_id, int type){
 }
 
 void make_transaction_with_selected_account(long customer_id, long account_number){
+    if(mp[customer_id]->customer_accounts[account_number].account_type > 2){
+        cout<< "This is your loan account, Please select saving or current account\n";
+        return;
+    }
+
     cout<<"type Customer id of user jisko tum bhejna cahete ho\n";
     long receiver_customer_id, receiver_account_number;
     cin>>receiver_customer_id;
@@ -400,18 +445,29 @@ void make_transaction_with_selected_account(long customer_id, long account_numbe
         cout<< "You not have this much ammount in your bank \n";
         return;
     }
- 
-    cout<<"I am at step 1\n";
+
+    date *transaction_date = new date;
+    cout<<"Enter Todays's date in DDMMYYYY formate\n";
+    long todays_date;
+    cin>>todays_date;
+    transaction_date->day = todays_date/1000000;
+    transaction_date->month = (todays_date%1000000 - todays_date%10000)/10000;
+    transaction_date->year =todays_date%10000;
+    
+    long charge=0;
+    
+    if(mp[customer_id]->customer_accounts[account_number].account_type ==2){
+        double curr_charge = (((double)ammount)*(0.5))/100;
+        charge = long(curr_charge);
+        if(charge > 500) charge =500;
+    }
+
 
     customer *receiver_customer = mp[receiver_customer_id];
     account receiver_account = receiver_customer->customer_accounts[receiver_account_number];
-
-    cout<<"I am at step 2\n";
     
     transaction *sender_transaction = new transaction;
     transaction *receiver_transaction = new transaction;
-
-    cout<<"I am at step 3\n";
 
     string sender_name = this_customer->first_name + " "+ this_customer->middle_name+ " " + this_customer->last_name;
     string receiver_name = receiver_customer->first_name + " " + receiver_customer->middle_name+ " "+ receiver_customer->last_name;
@@ -419,30 +475,27 @@ void make_transaction_with_selected_account(long customer_id, long account_numbe
     string sender_comment = "send " + _ammount + " to " + receiver_name;
     string receiver_comment = "receive "+ _ammount + "from " + sender_name;
 
-cout<<"I am at step 4\n";
-
     sender_transaction->ammount = ammount;
     sender_transaction->comment = sender_comment;
     sender_transaction->prev = mp[customer_id]->customer_accounts[account_number].last_transaction;
+    sender_transaction->transaction_type = 5;
+    sender_transaction->transaction_date = transaction_date;
+    sender_transaction->transaction_charge = charge;
     mp[customer_id]->customer_accounts[account_number].last_transaction->next = sender_transaction;
-   // this_account.last_transaction = sender_transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction = this_account.last_transaction->next;
     mp[customer_id]->customer_accounts[account_number].total_ammount -= ammount;
     mp[customer_id]->customer_accounts[account_number].total_transaction = this_account.total_transaction +1;
-    
-    cout<<"I am at step 5\n";
 
-   // sender_transaction = sender_transaction->prev;
-   // cout<<sender_transaction->ammount << "   "<< sender_transaction->comment<<endl;
-   // cout<<receiver_transaction->ammount<<"  "<<receiver_transaction->comment<<endl;
-
+    this_month_profit += charge;
 
     receiver_transaction->ammount = ammount;
     receiver_transaction->comment = receiver_comment;
     receiver_transaction->prev = mp[receiver_customer_id]->customer_accounts[receiver_account_number].last_transaction;
+    receiver_transaction->transaction_type = 6;
+    receiver_transaction->transaction_date = transaction_date;
+    receiver_transaction->transaction_charge = 0;
     mp[receiver_customer_id]->customer_accounts[receiver_account_number].last_transaction->next = receiver_transaction;
     mp[receiver_customer_id]->customer_accounts[receiver_account_number].last_transaction= receiver_account.last_transaction->next;
-   // receiver_account.last_transaction = receiver_transaction;
     mp[receiver_customer_id]->customer_accounts[receiver_account_number].total_ammount += ammount;
 
     cout<<"----------------------------------------\n";
@@ -452,8 +505,7 @@ cout<<"I am at step 4\n";
 }
 
 void Make_an_transaction(long customer_id){
-    cout<<"Choice By which account you want to make transaction\n";
-    
+       
 
     customer *this_customer = mp[customer_id];
     map<long, account> user_accounts = this_customer->customer_accounts;
@@ -461,6 +513,7 @@ void Make_an_transaction(long customer_id){
     vector<long> user_account_numbers; 
 
   //  cout<<"Select One Option\n";
+    cout<<"Choice By which account you want to make transaction\n";
     int i=1;
     for(auto x: user_accounts){
         cout<<i++<<". Account Number: "<<x.first<<"      Account type: "<<account_type[x.second.account_type -1]<<endl;
@@ -644,7 +697,7 @@ long total_withdraw_in_one_day(long customer_id, long account_number,date* today
         long days = days_between_two_dates(today_date, transaction_date);
         if(days == 0) {
       //if(today_date == transaction_date){
-        ammount += abs(temp->ammount); 
+       if(temp->transaction_type == 2) ammount += abs(temp->ammount); 
         
       }
       else break;
@@ -657,13 +710,13 @@ return ammount;
 void withdrow_money_using_atm(long customer_id){
     print_user_info(customer_id);
     long account_number = give_account_option(customer_id);
-    if(account_number ==0 )return;
+    if(account_number ==0 || account_number == -1)return;
 
     long ammount;
     long account_type = mp[customer_id]->customer_accounts[account_number].account_type;
 
     if(account_type > 2){
-        cout<<"You not withdraw money from loan account\n  ";
+        cout<<"This is loan account please select saving or current account\n";
         return;
     }
 
@@ -672,7 +725,7 @@ void withdrow_money_using_atm(long customer_id){
 
     date *transaction_date = new date;
     cout<<"Enter Todays's date in DDMMYYYY formate\n";
-    int todays_date;
+    long todays_date;
     cin>>todays_date;
     transaction_date->day = todays_date/1000000;
     transaction_date->month = (todays_date%1000000 - todays_date%10000)/10000;
@@ -707,6 +760,7 @@ void withdrow_money_using_atm(long customer_id){
         if(charge > 500) charge =500;
     }
 
+    this_month_profit += charge;
     
 
     mp[customer_id]->customer_accounts[account_number].total_ammount -= (ammount + charge);
@@ -726,48 +780,88 @@ void withdrow_money_using_atm(long customer_id){
     cout<<"-----------------------------\n";
     cout<<"ATM transaction successfull\n";  
 
-
-
-   // account this_account = this_customer->customer_accounts[account_number];
-
 }
+
+long this_month_deposit(long customer_id, long account_number, date* today_date){
+    transaction* temp = mp[customer_id]->customer_accounts[account_number].last_transaction;
+    long ammount = 0;
+    while(temp){
+        
+        date *transaction_date = temp->transaction_date;
+        if((transaction_date->year == today_date->year) && (transaction_date->month == today_date->month)){
+           if(temp->transaction_type != 1) {
+            ammount += abs(temp->ammount);
+           }
+        }
+        else break;
+        temp = temp->prev;
+    }
+    return ammount;
+}
+
 void deposit_money_in_bank_account(long customer_id){
     print_user_info(customer_id);
     long account_number = give_account_option(customer_id);
-
+    if(account_number == -1) return;
     long account_type = mp[customer_id]->customer_accounts[account_number].account_type;
-    
-    if(account_type > 2){
-        cout<<"You want to deposit in loan account ";
-        
-        ////////////add condition
-    }
 
     long ammount;
     cout<<"Enter ammount that you want to deposit\n";
     cin>>ammount;
 
+    
+
      date *transaction_date = new date;
-    cout<<"Enter Todays's date in DDMMYYYY formate\n1";
-    int todays_date;
+    cout<<"Enter Todays's date in DDMMYYYY formate\n";
+    long todays_date;
     cin>>todays_date;
     transaction_date->day = todays_date/1000000;
     transaction_date->month = (todays_date%1000000 - todays_date%10000)/10000;
     transaction_date->year =todays_date%10000;
 
-    mp[customer_id]->customer_accounts[account_number].total_ammount += ammount;
-    if(mp[customer_id]->customer_accounts[account_number].account_type > 2){
-        mp[customer_id]->customer_accounts[account_number].total_ammount -= 2*ammount;
-    }
-    mp[customer_id]->customer_accounts[account_number].total_transaction +=1;
+    if(account_type > 2){
+       transaction* temp = mp[customer_id]->customer_accounts[account_number].last_transaction;
+       while(temp->prev  != NULL) temp = temp->prev;
 
+       long max_deposit_money = ((temp->ammount)*10)/100;
+       long  deposited_ammount =  this_month_deposit(customer_id, account_number, transaction_date);
+       max_deposit_money -= deposited_ammount;
+
+       if(ammount > max_deposit_money){
+            cout<<"You can not deposit more then rs. "<<max_deposit_money<<" in this loan account\n";
+           return;
+       }
+       if(ammount >= mp[customer_id]->customer_accounts[account_number].total_ammount){
+            long years = transaction_date->year - temp->transaction_date->year;
+            if((transaction_date->month < temp->transaction_date->month) || (transaction_date->month== temp->transaction_date->month) && (transaction_date->day < temp->transaction_date->day)){
+                years--;
+            }
+
+            if(years < 2){
+                cout<<"You can not pay all ammount before two years\n";
+                return;
+            }
+            else{
+                ammount = mp[customer_id]->customer_accounts[account_number].total_ammount;
+                cout<<"your remaing loan ammount is only: "<<ammount<<" We only deposit ammount: "<<ammount<<" in your loan account\n";
+            }
+       }
+
+       mp[customer_id]->customer_accounts[account_number].total_ammount -= ammount;
+        
+    }
+
+   else mp[customer_id]->customer_accounts[account_number].total_ammount += ammount;
+
+    mp[customer_id]->customer_accounts[account_number].total_transaction +=1;
     
     transaction* new__transaction = new transaction;
     new__transaction->ammount = ammount;
     new__transaction->comment = "Deposit money in bank account";
     new__transaction->transaction_date = transaction_date;
     new__transaction->transaction_charge =0;
-    new__transaction->transaction_type=1;
+   if(account_type > 2) new__transaction->transaction_type=4;
+    new__transaction->transaction_type=4;
     new__transaction->prev = mp[customer_id]->customer_accounts[account_number].last_transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction->next = new__transaction;
     mp[customer_id]->customer_accounts[account_number].last_transaction = mp[customer_id]->customer_accounts[account_number].last_transaction->next;
@@ -883,7 +977,7 @@ long min_(long a, long b){
 
 
 
-long total_interest(long customer_id, long account_number, date* today_date){
+long compound_interest(long customer_id, long account_number, date* today_date){
   
     long days=30;
     transaction *temp = mp[customer_id]->customer_accounts[account_number].last_transaction;
@@ -910,19 +1004,61 @@ long total_interest(long customer_id, long account_number, date* today_date){
     } 
 
 
-    // double _ammount = (double)starting_month_balance;
-    // double rate = (double)interest_rate[account_type];
+    double _ammount = (double)starting_month_balance;
+    double rate = (double)interest_rate[account_type-1];
     
-    // for(int i =ammount_and_days.size()-1 ;i >=0 ;i--){
-    //     _ammount += ammount_and_days[i].first;
-    //     double time = ammount_and_days[i].second;
-    //     double factor =  pow(1+rate/100, time);
-    //     ammount *= factor;
-    // }
+    for(int i =ammount_and_days.size()-1 ;i >=0 ;i--){
+        _ammount += ammount_and_days[i].first;
+        double time = ammount_and_days[i].second;
+        double factor =  pow((1+rate/200), time/(30*6));
+        _ammount *= factor;
+        cout<<factor<<" this is factor"<<endl;
+    }
+    this_month_profit += (long(_ammount) - ammount);
 
-cout<<"to return\n";
+//cout<<"to return\n";
   // return double(_ammount) - (double)ammount;
-  return 124;
+  return long(_ammount) - ammount;
+
+}
+
+long simple_interest(long customer_id, long account_number, date* today_date){
+    long days=30;
+    transaction *temp = mp[customer_id]->customer_accounts[account_number].last_transaction;
+    long ammount = mp[customer_id]->customer_accounts[account_number].total_ammount;
+    long account_type = mp[customer_id]->customer_accounts[account_number].account_type;
+
+    vector<pair<long, long > > ammount_and_days;
+
+    long starting_month_balance = ammount;
+
+    while(temp != NULL){
+        date *transaction_date = temp->transaction_date;
+        long transaction_ammount = temp->ammount;
+
+        starting_month_balance -= transaction_ammount;
+     long days_between =  days_between_two_dates(today_date, transaction_date);
+     today_date = transaction_date;
+       ammount_and_days.push_back(make_pair(transaction_ammount, days_between));
+        days -=days_between;
+        if(days <= 0){
+            break;
+        }
+            temp = temp->prev;
+    } 
+
+
+    double _ammount = (double)starting_month_balance;
+    double rate = (double)interest_rate[account_type-1];
+    double interest = 0;
+    for(int i =ammount_and_days.size()-1 ;i >=0 ;i--){
+        starting_month_balance += ammount_and_days[i].first;
+        double time = ammount_and_days[i].second;
+         interest =  (starting_month_balance*time*rate)/(100*12*30); 
+    }
+    this_month_profit -= (long)interest;
+   return (long)interest;
+
 
 }
 
@@ -931,7 +1067,10 @@ void add_interest_money(long customer_id, long account_number, date* today_date)
     int account_type = mp[customer_id]->customer_accounts[account_number].account_type;
     if(account_type == 2) return;
     cout<<"calculate total interest in this account\n " <<account_number<<endl;
-    long ammount = total_interest(customer_id,account_number,today_date);
+    long ammount =0;
+
+    if(account_type == 1) ammount = simple_interest(customer_id,account_number,today_date);
+    else if(account_type >2) ammount = compound_interest(customer_id, account_number, today_date);
 
     mp[customer_id]->customer_accounts[account_number].total_ammount += ammount;
     
@@ -949,36 +1088,10 @@ void add_interest_money(long customer_id, long account_number, date* today_date)
     cout<<"interest added successfully\n";
 }
 
-
-void month_end(){
-    date *transaction_date = new date;
-    cout<<"Enter Todays's date in DDMMYYYY formate\n";
-    int todays_date;
-    cin>>todays_date;
-    transaction_date->day = todays_date/1000000;
-    transaction_date->month = (todays_date%1000000 - todays_date%10000)/10000;
-    transaction_date->year =todays_date%10000;
-
-    for(auto this_customer : mp){
-        long customer_id = this_customer.first;
-
-        for(auto user_account : (mp[customer_id]->customer_accounts)){
-            long account_number = user_account.second.account_number;
-            cout<<"add interest in this account \n " <<account_number<<endl;
-            add_interest_money(customer_id, account_number, transaction_date);
-
-            mp[customer_id]->customer_accounts[account_number].atm_transaction = 0;
-            mp[customer_id]->customer_accounts[account_number].total_transaction = 0;
-        } 
-    }
-
-    cout<<"interest addedddddddd successfully\n";
-}
-
 void less_NRV_fine(){
     date *transaction_date = new date;
     cout<<"Enter Todays's date in DDMMYYYY formate\n";
-    int todays_date;
+    long todays_date;
     cin>>todays_date;
     transaction_date->day = todays_date/1000000;
     transaction_date->month = (todays_date%1000000 - todays_date%10000)/10000;
@@ -991,10 +1104,11 @@ void less_NRV_fine(){
             long account_number = user_account.first;
             long ammount =0;
             if(user_account.second.account_type == 1) ammount = 1000;
-            else if(user_account.second.account_type==2) ammount =5000;
+            else if(user_account.second.account_type==2) ammount = 5000;
             else break;
 
-            mp[customer_id]->customer_accounts[account_number].total_ammount += ammount;
+            this_month_profit += ammount;
+            mp[customer_id]->customer_accounts[account_number].total_ammount -= ammount;
     
             transaction* new__transaction = new transaction;
             new__transaction->ammount = ammount;
@@ -1015,6 +1129,38 @@ void less_NRV_fine(){
 }
 
 
+void month_end(){
+   // this_month_profit = 0;
+    less_NRV_fine();
+
+    date *transaction_date = new date;
+    cout<<"Enter Todays's date in DDMMYYYY formate\n";
+    long todays_date;
+    cin>>todays_date;
+    transaction_date->day = todays_date/1000000;
+    transaction_date->month = (todays_date%1000000 - todays_date%10000)/10000;
+    transaction_date->year =todays_date%10000;
+
+    for(auto this_customer : mp){
+        long customer_id = this_customer.first;
+
+        for(auto user_account : (mp[customer_id]->customer_accounts)){
+            long account_number = user_account.second.account_number;
+            cout<<"add interest in this account \n " <<account_number<<endl;
+            add_interest_money(customer_id, account_number, transaction_date);
+
+            mp[customer_id]->customer_accounts[account_number].atm_transaction = 0;
+            mp[customer_id]->customer_accounts[account_number].total_transaction = 0;
+        } 
+    }
+
+    cout<<"interest addedddddddd successfully\n";
+    cout<<"This month profit: "<<this_month_profit<<endl;
+    profit.push_back(this_month_profit);
+    this_month_profit = 0;
+}
+
+
 void Bank_employ_view(){
     cout<<"What you want to see\n";
     cout<<"1. print all customer\n";
@@ -1027,7 +1173,7 @@ void Bank_employ_view(){
 
     if(responce==1) print_customer();
     else if(responce==2)month_end();
-    else if(responce==3) less_NRV_fine();
+  //  else if(responce==3) less_NRV_fine();
     else return;
 
    // print_customer();
@@ -1067,6 +1213,7 @@ int main(){
     ATM_NUMBER = 2345378987654389;
     mp.clear();
     account_type.clear();
+    this_month_profit = 0;
    // account_type = {"Saving Account", "Current Account", "Home Loan", "Car loan", "Personal loan", "Business Loan"};
     account_type.push_back("Saving Account");
     account_type.push_back("Current Account");
@@ -1075,6 +1222,14 @@ int main(){
     account_type.push_back("Personal Loan");
     account_type.push_back("Business Loan");
     //interest_rate = {6.0 ,0.0 ,7.0 ,8.0 ,12.0 ,15.0 };
+    interest_rate.clear();
+    interest_rate.push_back(6.0);
+    interest_rate.push_back(0.0);
+    interest_rate.push_back(7.0);
+    interest_rate.push_back(8.0);
+    interest_rate.push_back(12.0);
+    interest_rate.push_back(15.0);
+    profit.clear();
 
     who_are_you();
     
